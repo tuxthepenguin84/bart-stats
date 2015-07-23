@@ -1,0 +1,16 @@
+# /bin/bash
+clear
+URL="http://api.bart.gov/api/"
+KEY="&key=MW9S-E7SL-26DU-VV8V"
+figlet "BART  Stats"
+echo ---------------------------------------------------
+date
+echo
+echo -e "\e[4mAdvisory Information\e[24m"
+echo -n "Advisories: "
+lynx -dump ${URL}bsa.aspx?cmd=bsa${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
+echo -n "Elevator Information: "
+lynx -dump ${URL}bsa.aspx?cmd=elev${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
+echo -n "Trains in Service: "
+lynx -dump ${URL}bsa.aspx?cmd=count${KEY} | grep traincount | cut -d">" -f2 | cut -d"<" -f1
+
