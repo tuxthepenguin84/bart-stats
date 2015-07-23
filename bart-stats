@@ -1,16 +1,46 @@
-# /bin/bash
+#! /bin/bash
+# Requirements: curl, lynx, tidy
 clear
+# Variables
 URL="http://api.bart.gov/api/"
-KEY="&key=MW9S-E7SL-26DU-VV8V"
+KEY="MW9S-E7SL-26DU-VV8V"
+ADVISORIES="bsa.aspx?cmd=bsa&key="
+ELEVATORS="bsa.aspx?cmd=elev&key="
+TRAINS="bsa.aspx?cmd=count&key="
+ORIG="etd.aspx?cmd=etd&orig=$1&key="
+STNS="stn.aspx?cmd=stns&key="
+
+# Title
 figlet "BART  Stats"
+
+# Code Start
 echo ---------------------------------------------------
 date
 echo
 echo -e "\e[4mAdvisory Information\e[24m"
 echo -n "Advisories: "
-lynx -dump ${URL}bsa.aspx?cmd=bsa${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
+#curl --silent ${URL}${ADVISORIES}${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
 echo -n "Elevator Information: "
-lynx -dump ${URL}bsa.aspx?cmd=elev${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
+#curl --silent ${URL}${ELEVATORS}${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
 echo -n "Trains in Service: "
-lynx -dump ${URL}bsa.aspx?cmd=count${KEY} | grep traincount | cut -d">" -f2 | cut -d"<" -f1
+#curl --silent ${URL}${TRAINS}${KEY} | grep traincount | cut -d">" -f2 | cut -d"<" -f1
+echo
+echo -e "\e[4mRealtime Information\e[24m"
+echo "Estimated Time of Departure: "
+echo
+ETD=$(curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${ORIG}${KEY} | tidy -xml -quiet)
+echo "$ETD" | grep name | cut -d">" -f2 | cut -d"<" -f1
+echo
+printf "%31s Line | Departing In (minutes)\n"
+for (( SELECT=1; SELECT<=$(echo "$ETD" | grep destination -c); SELECT++ ))
+  do
+    LINE=$(echo "$ETD" | grep destination | sed -n "$SELECT"p | cut -d">" -f2 | cut -d"<" -f1)
+    TIME1=$(echo "$ETD" | grep destination -A 3 | grep minutes | sed -n "$SELECT"p | cut -d">" -f2 | cut -d"<" -f1)
+    TIME2=$(echo "$ETD" | grep destination -A 12 | grep minutes | sed -n "$((SELECT*2))"p | cut -d">" -f2 | cut -d"<" -f1)
+    TIME3=$(echo "$ETD" | grep destination -A 21 | grep minutes | sed -n "$((SELECT*3))"p | cut -d">" -f2 | cut -d"<" -f1)
+    printf "$LINE %"$((35-${#LINE}))"s | $TIME1 %"$((7-${#TIME1}))"s $TIME2 %"$((7-${#TIME2}))"s $TIME3\n"
+    #echo "$ETD" | grep destination -A 12
+  done
 
+
+#curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${WCRK}${KEY} | tidy -xml -indent -quiet
