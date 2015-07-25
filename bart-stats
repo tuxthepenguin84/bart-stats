@@ -12,25 +12,27 @@ STNS="stn.aspx?cmd=stns&key="
 
 # Title
 figlet "BART  Stats"
-
+if [ -z "$1" ]; then
+  echo "Usage: ./bart-stats stationid"
+  echo "Example: ./bart-stats 12th"
+  exit
+fi
 # Code Start
 echo ---------------------------------------------------
 date
 echo
 echo -e "\e[4mAdvisory Information\e[24m"
 echo -n "Advisories: "
-#curl --silent ${URL}${ADVISORIES}${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
+curl --silent ${URL}${ADVISORIES}${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
 echo -n "Elevator Information: "
-#curl --silent ${URL}${ELEVATORS}${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
+curl --silent ${URL}${ELEVATORS}${KEY} | grep description | cut -d"[" -f3 | cut -d"]" -f1
 echo -n "Trains in Service: "
-#curl --silent ${URL}${TRAINS}${KEY} | grep traincount | cut -d">" -f2 | cut -d"<" -f1
+curl --silent ${URL}${TRAINS}${KEY} | grep traincount | cut -d">" -f2 | cut -d"<" -f1
 echo
 echo -e "\e[4mRealtime Information\e[24m"
-echo "Estimated Time of Departure: "
-echo
+echo -n "Estimated Time of Departure From Station: "
 ETD=$(curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${ORIG}${KEY} | tidy -xml -quiet)
 echo "$ETD" | grep name | cut -d">" -f2 | cut -d"<" -f1
-echo
 printf "%31s Line | Departing In (minutes)\n"
 for (( SELECT=1; SELECT<=$(echo "$ETD" | grep destination -c); SELECT++ ))
   do
@@ -41,6 +43,4 @@ for (( SELECT=1; SELECT<=$(echo "$ETD" | grep destination -c); SELECT++ ))
     printf "$LINE %"$((35-${#LINE}))"s | $TIME1 %"$((7-${#TIME1}))"s $TIME2 %"$((7-${#TIME2}))"s $TIME3\n"
     #echo "$ETD" | grep destination -A 12
   done
-
-
-#curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${WCRK}${KEY} | tidy -xml -indent -quiet
+echo
