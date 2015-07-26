@@ -18,13 +18,8 @@ STNS="stn.aspx?cmd=stns&key="
 FARE="sched.aspx?cmd=fare&orig=$2&dest=$3&key="
 START=$2
 END=$3
-
-# Usage
-if [ -z "$1" ]; then
-  echo "Usage: ./bart-stats stationid startstation endstation"
-  echo "Example: ./bart-stats stationid rich sfia"
-  exit
-fi
+STARTVAL=0
+ENDVAL=0
 
 # Title
 figlet "BART  Stats"
@@ -32,7 +27,59 @@ echo ---------------------------------------------------
 date
 echo
 
+# Station Validation
+if [ ! -z $2 ]; then
+  STNSLIST=$(curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${STNS}${KEY} | tidy -xml -quiet)
+  for (( SELECT=1; SELECT<=$(echo "$STNSLIST" | grep abbr -c); SELECT++ ))
+    do
+      STNSABBR=$(echo "$STNSLIST" | grep abbr | sed -n "$SELECT"p | cut -d">" -f2 | cut -d"<" -f1)
+      if [ ${2,,} = ${STNSABBR,,} ]; then
+        STARTVAL=1
+      fi
+    done
+  if [ ! -z $3 ]; then
+    for (( SELECT=1; SELECT<=$(echo "$STNSLIST" | grep abbr -c); SELECT++ ))
+      do
+        STNSABBR=$(echo "$STNSLIST" | grep abbr | sed -n "$SELECT"p | cut -d">" -f2 | cut -d"<" -f1)
+        if [ ${3,,} = ${STNSABBR,,} ]; then
+          ENDVAL=1
+        fi
+      done
+    if [ "$ENDVAL" == "0" ]; then
+      echo "Looks like you misspelled your 2nd station ID, please run the following to get a list of BART station IDs: ./bart-status stationlist"
+      exit
+    fi
+  fi
+  if [ "$STARTVAL" == "0" ]; then
+    echo "Looks like you misspelled your 1st station ID, please run the following to get a list of BART station IDs: ./bart-status stationlist"
+    exit
+  fi
+fi
+echo
+
 # Functions
+# Usage
+Fusage(){
+
+  echo "BART Stats Usage:"
+  echo
+  echo -e "\e[4mstationid\e[24m - Shows Realtime Station Information w/ Estimated Time of Departure, requires starting station and optional end station."
+  echo "Usage: ./bart-stats stationid startstation"
+  echo "Example: ./bart-stats stationid rich"
+  echo "Usage: ./bart-stats stationid startstation endstation"
+  echo "Example: ./bart-stats stationid rich sfia"
+  echo "Additional Notes: When specifying an end station, the fare will automatically be calculated and shown."
+  echo
+  echo -e "\e[4mfare\e[24m - Shows the fare between two stations. Requires starting station and end station."
+  echo "Usage: /bart-stats fare startstation endstation"
+  echo "Example: ./bart-stats fare rich sfia"
+  echo
+  echo -e "\e[4mstationlist\e[24m - Shows a list of all stations with station ID."
+  echo "Usage: ./bart-stats stationlist"
+  echo "Example: ./bart-stats stationlist"
+  echo
+}
+
 # Advisories Information
 Fadvisories(){
 echo -e "\e[4mAdvisory Information\e[24m"
@@ -46,7 +93,7 @@ echo
 }
 
 # Realtime Station Information
-Fstationid(){
+Fstation(){
 echo -e "\e[4mRealtime Information\e[24m"
 echo -n "Estimated Time of Departure From Station: "
 ETD=$(curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${ORIG}${KEY} | tidy -xml -quiet)
@@ -74,11 +121,10 @@ echo
 
 # Fare Cost
 Ffare(){
-echo -e "\e[4mFare\e[24m"
 if [ -z "$START" ] || [ -z "$END" ]; then
-echo "Missing start and/or end destinations."
-echo "Example: ./bart-stats fare rich sfia"
+Fusage
 else
+echo -e "\e[4mFare\e[24m"
 echo -n "From Station: "
 curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${STNS}${KEY} | tidy -xml -quiet | grep -i -B 1 $START | grep name | cut -d">" -f2 | cut -d"<" -f1
 echo -n "To Station:   "
@@ -86,10 +132,14 @@ curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X
 echo -n "$"
 curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${FARE}${KEY} | tidy -xml -quiet | grep "<fare>" | cut -d">" -f2 | cut -d"<" -f1
 fi
+if [ "$START" == "$END" ]; then
+  echo "You've selected an excursion route.  You will have 3 hours to enter and exit the same station."
+  exit
+fi
 echo
 }
 
-# List stationlist
+# List Stations
 Fstationlist(){
 STNSLIST=$(curl --silent -H "Accept: application/xml" -H "Content-Type: application/xml" -X GET ${URL}${STNS}${KEY} | tidy -xml -quiet)
   for (( SELECT=1; SELECT<=$(echo "$STNSLIST" | grep name -c); SELECT++ ))
@@ -101,11 +151,22 @@ STNSLIST=$(curl --silent -H "Accept: application/xml" -H "Content-Type: applicat
 echo
 }
 
+if [ -z "$1" ]; then
+  Fusage
+  exit
+fi
+
 case $1 in
-  "stationid")
-    Fadvisories
-    Fstationid
-    Ffare
+  "station")
+    if [ -z "$START" ]; then # If no starting station given, run Usage function
+      Fusage
+      else
+      Fadvisories
+      Fstation
+      if [ ! -z "$END" ]; then # if end station is not null, run Fare Cost function
+        Ffare
+      fi
+    fi
     ;;
   "fare")
     Ffare
@@ -114,6 +175,7 @@ case $1 in
     Fstationlist
     ;;
   *)
+  Fusage
   exit
   ;;
 esac
